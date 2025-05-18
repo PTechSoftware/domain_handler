@@ -6,19 +6,28 @@ use super::{domains::list_domains, duck_communicate::{get_public_ip, send_update
 pub async fn run_loop() {
     let mut previous_ip = String::new();
     let mut had_previous_errors = false;
+    let mut flag = false;
     let mut dms = String::new();
 
     loop {
 
         let _ = purge_log();
         let domains = list_domains();
-        let dms_cal = domains.join("");
-
+        let mut calc = String::new();
+        for el in domains.iter() {
+            calc.push_str(&el.name);
+        }
+        if dms != calc {
+            dms = calc.clone();
+            flag = true;
+        }
+        
+        
         match get_public_ip() {
             Ok(current_ip) => {
                 let ip_changed = current_ip != previous_ip;
 
-                if !ip_changed && !had_previous_errors {
+                if !ip_changed && !had_previous_errors && !flag {
                     // Nada que hacer
                     continue;
                 }
@@ -36,7 +45,8 @@ pub async fn run_loop() {
 
                 previous_ip = current_ip.clone();
                 had_previous_errors = false;
-
+                flag = false;
+                let mut err_ctr = 0;
                 for domain in domains.into_iter().filter(|d| d.activated) {
                     match send_update(&domain.name, &current_ip, &domain.token, domain.txt.clone()).await {
                         Ok(res) => {
@@ -46,8 +56,6 @@ pub async fn run_loop() {
                                 domain.name,
                                 res.status()
                             ), false);
-                            //override if it s ok
-                            entry_for_errorlog("",true);
                         }
                         Err(err) => {
                             had_previous_errors = true;
@@ -55,8 +63,14 @@ pub async fn run_loop() {
                                 "[ERROR] Failed to update {}: {}",
                                 domain.name, err
                             ), false);
+                            err_ctr += 1;
                         }
                     }
+                }
+                if err_ctr > 0 {
+                    flag = true;
+                }else{
+                    flag = false;
                 }
             }
             Err(err) => {
