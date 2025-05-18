@@ -1,6 +1,5 @@
 use crate::process::logger::{entry_for_log, purge_log};
-use tokio::time::sleep;
-use std::time::Duration;
+
 
 use super::{domains::list_domains, duck_communicate::{get_public_ip, send_update}};
 
@@ -11,7 +10,6 @@ pub async fn run_loop() {
     let mut had_previous_errors = false;
 
     loop {
-        sleep(Duration::from_secs(60)).await;
 
         let _ = purge_log();
 

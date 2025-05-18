@@ -167,7 +167,7 @@ pub fn uninstall_service() -> anyhow::Result<()> {
         }
     }
 
-    match Command::new("systemctl").args(["--user", "daemon-reload"]).status() {
+    match Command::new("systemctl").args(["daemon-reload"]).status() {
         Ok(status) if status.success() => println!("[OK] Reloaded systemd"),
         Ok(status) => eprintln!("[ERR] systemctl reload failed with code {:?}", status.code()),
         Err(e) => eprintln!("[ERR] Running systemctl reload: {e}"),
@@ -179,10 +179,10 @@ pub fn uninstall_service() -> anyhow::Result<()> {
 
 pub fn set_enable_on_boot(enable: bool) -> anyhow::Result<()> {
     let action = if enable { "enable" } else { "disable" };
-    println!("[INFO] systemctl --user {} domainhdlr.service", action);
+    println!("[INFO] systemctl {} domainhdlr.service", action);
 
     match Command::new("systemctl")
-        .args(["--user", action, "domainhdlr.service"])
+        .args([action, "domainhdlr.service"])
         .output()
     {
         Ok(output) => {
