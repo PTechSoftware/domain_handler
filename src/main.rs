@@ -41,10 +41,7 @@ async fn main() {
             delete_domain(&name);
         }
         Commands::ListDomain => {
-            let list = list_domains();
-            for d in list {
-                println!("{}", d);
-            }
+            list_domains();
         }
     }
 }
