@@ -1,87 +1,47 @@
 use std::fs;
 use std::io::{Write, Read};
 use std::os::unix::fs::PermissionsExt;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::process::Command;
-
-// === Paths ===
-
-fn home_dir() -> PathBuf {
-    dirs::home_dir().expect("No home directory found")
-}
-
-fn local_bin() -> PathBuf {
-    home_dir().join(".local/bin")
-}
-
-fn config_dir() -> PathBuf {
-    home_dir().join(".config/domainhdlr")
-}
-
-fn systemd_user_dir() -> PathBuf {
-    home_dir().join(".config/systemd/user")
-}
-
-fn service_path() -> PathBuf {
-    systemd_user_dir().join("domainhdlr.service")
-}
-
-fn bin_dest() -> PathBuf {
-    local_bin().join("domainhdlr")
-}
-
-fn config_dest() -> PathBuf {
-    config_dir().join("domainhdlr.json")
-}
-
-// === Add ~/.local/bin to PATH ===
-
-fn ensure_local_bin_in_path() -> anyhow::Result<()> {
-    let home = home_dir();
-    let bashrc_path = home.join(".bashrc");
-    let export_line = r#"export PATH="$HOME/.local/bin:$PATH""#;
-
-    // Leer o crear .bashrc
-    let mut content = if bashrc_path.exists() {
-        fs::read_to_string(&bashrc_path)?
-    } else {
-        String::new()
-    };
-
-    if !content.contains(export_line) {
-        let mut file = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&bashrc_path)?;
-        writeln!(file, "\n{}", export_line)?;
-        println!("➕ Added ~/.local/bin to PATH in .bashrc");
-    }
-
-    Ok(())
-}
-
-// === Install ===
+use crate::process::rutas::{bin_dir, bin_path, config_dir, config_file, service_path, systemd_user_dir};
 
 pub fn install_service() -> anyhow::Result<()> {
-    // Crear carpetas necesarias
-    fs::create_dir_all(local_bin())?;
+    fs::create_dir_all(bin_dir())?;
     fs::create_dir_all(config_dir())?;
     fs::create_dir_all(systemd_user_dir())?;
 
-    // Copiar ejecutable
-    fs::copy("domainhdlr", &bin_dest())?;
-    fs::set_permissions(&bin_dest(), fs::Permissions::from_mode(0o755))?;
+    // Copiar binario
+    fs::copy("domainhdlr", &bin_path())?;
+    fs::set_permissions(&bin_path(), fs::Permissions::from_mode(0o755))?;
 
     // Copiar config si existe
     if Path::new("domainhdlr.json").exists() {
-        fs::copy("domainhdlr.json", &config_dest())?;
-        fs::set_permissions(&config_dest(), fs::Permissions::from_mode(0o644))?;
+        fs::copy("domainhdlr.json", &config_file())?;
+        fs::set_permissions(&config_file(), fs::Permissions::from_mode(0o644))?;
     }
 
-    // Agregar ~/.local/bin al PATH
-    ensure_local_bin_in_path()?;
+    let bashrc_path = dirs::home_dir().unwrap().join(".bashrc");
+    let export_line = r#"export PATH="$HOME/.local/bin:$PATH""#;
 
-    // Escribir service
+    let mut added_to_bashrc = false;
+
+    if bashrc_path.exists() {
+        let content = fs::read_to_string(&bashrc_path)?;
+        if !content.contains(export_line) {
+            let mut file = fs::OpenOptions::new()
+                .append(true)
+                .open(&bashrc_path)?;
+            writeln!(file, "\n{}", export_line)?;
+            added_to_bashrc = true;
+        }
+    } else {
+        // Crear nuevo .bashrc con export
+        let mut file = fs::File::create(&bashrc_path)?;
+        writeln!(file, "{}", export_line)?;
+        added_to_bashrc = true;
+    }
+
+    // Crear service file
     let service_content = format!(
         r#"[Unit]
 Description=Domain Handler Service for DuckDNS
@@ -96,39 +56,44 @@ WorkingDirectory={}
 [Install]
 WantedBy=default.target
 "#,
-        bin_dest().to_string_lossy(),
+        bin_path().to_string_lossy(),
         whoami::username(),
-        local_bin().to_string_lossy()
+        bin_dir().to_string_lossy()
     );
 
     fs::write(service_path(), service_content)?;
     fs::set_permissions(service_path(), fs::Permissions::from_mode(0o644))?;
 
-    // Reload systemd user units
     Command::new("systemctl")
         .args(["--user", "daemon-reload"])
         .status()?;
 
-    println!("✅ Service installed for current user.");
-    println!("➡️  Run `source ~/.bashrc` or restart your terminal.");
-    println!("➡️  Enable service: `systemctl --user enable --now domainhdlr.service`");
+    println!("✅ Service installed.");
+
+    if added_to_bashrc {
+        println!("➕ Added ~/.local/bin to PATH via .bashrc.");
+        println!("🔁 Please run `source ~/.bashrc` or reopen your terminal.");
+        println!("👉 Or run the install via:\n   source <(domainhdlr install)\n   to apply PATH instantly.");
+        println!("{}", export_line); // permite que el export funcione si se usa source <(...)>
+    }
 
     Ok(())
 }
 
-// === Uninstall ===
 
+// === Uninstall ===
 pub fn uninstall_service() -> anyhow::Result<()> {
     let _ = fs::remove_file(service_path());
-    let _ = fs::remove_file(bin_dest());
-    let _ = fs::remove_file(config_dest());
+    let _ = fs::remove_file(bin_path());
+    let _ = fs::remove_file(config_file());
 
+    // Borrar directorios si están vacíos
     if fs::read_dir(config_dir()).map_or(false, |mut d| d.next().is_none()) {
         let _ = fs::remove_dir(config_dir());
     }
 
-    if fs::read_dir(local_bin()).map_or(false, |mut d| d.next().is_none()) {
-        let _ = fs::remove_dir(local_bin());
+    if fs::read_dir(bin_dir()).map_or(false, |mut d| d.next().is_none()) {
+        let _ = fs::remove_dir(bin_dir());
     }
 
     Command::new("systemctl")
@@ -136,9 +101,9 @@ pub fn uninstall_service() -> anyhow::Result<()> {
         .status()?;
 
     println!("🗑️ Service uninstalled.");
+    println!("If you added to PATH manually in .bashrc, you may remove the export line.");
     Ok(())
 }
-
 // === Enable/Disable on boot ===
 
 pub fn set_enable_on_boot(enable: bool) -> anyhow::Result<()> {
@@ -148,7 +113,7 @@ pub fn set_enable_on_boot(enable: bool) -> anyhow::Result<()> {
         .status()?;
 
     if status.success() {
-        println!("🔁 Service {}d on user boot.", action);
+        println!("✅ Service {}d on user boot.", action);
     } else {
         eprintln!("❌ Failed to {} service.", action);
     }
