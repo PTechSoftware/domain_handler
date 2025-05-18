@@ -1,6 +1,6 @@
 use clap::Parser;
 use commands::{Cli, Commands};
-use process::{domains::{add_domain, delete_domain, list_domains}, ubuntu_service::{install_service, set_enable_on_boot, uninstall_service}};
+use process::{domains::{add_domain, delete_domain, list_domains}, logger::read_log_errors, ubuntu_service::{install_service, set_enable_on_boot, uninstall_service}};
 use service::{start, status, stop};
 
 mod commands;
@@ -42,6 +42,19 @@ async fn main() {
         }
         Commands::ListDomain => {
             list_domains();
+        }
+        Commands::ViewLog => {
+            let l = read_log_errors();
+            match l {
+                Ok(d) => {
+                    for el in d {
+                        println!("{}", el)
+                    }
+                }
+                _ => {
+                    println!("Failed retrive logs")
+                }
+            }
         }
     }
 }

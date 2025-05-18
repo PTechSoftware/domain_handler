@@ -1,33 +1,54 @@
 use std::fs::{self, OpenOptions};
-use std::io::{self, Read, Seek, SeekFrom, Write};
+use std::io::{self, Write};
+use std::path::Path;
 use chrono::Local;
-use crate::process::rutas::log_file;
+use super::rutas::{log_file, log_file_error};
 
-/// Adds a log entry with a timestamp to the beginning of the file.
-/// Creates the file if it doesn't exist.
-pub fn entry_for_log(line: &str) -> io::Result<()> {
+/// Escribe una entrada en el log. Si `overwrite` es true, reemplaza todo el contenido.
+/// De lo contrario, inserta la nueva entrada al inicio.
+pub fn entry_for_log(line: &str, overwrite: bool) -> io::Result<()> {
     let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
     let log_entry = format!("[{}] {}\n", timestamp, line);
 
     let log_path = log_file();
-    let mut file = OpenOptions::new()
-        .read(true)
-        .write(true)
-        .create(true)
-        .open(&log_path)?;
+    let _ = ensure_file_exists(&log_path);
 
-    let mut contents = String::new();
-    file.read_to_string(&mut contents)?;
-    file.seek(SeekFrom::Start(0))?;
-    file.write_all(log_entry.as_bytes())?;
-    file.write_all(contents.as_bytes())?;
+    if overwrite {
+        overwrite_file(log_path.to_str().unwrap(), &log_entry)?;
+    } else {
+        prepend_log_entry(log_path.to_str().unwrap(), &log_entry)?;
+    }
+
+    Ok(())
+}
+pub fn entry_for_errorlog(line: &str, overwrite: bool) -> io::Result<()> {
+    let timestamp = Local::now().format("%Y-%m-%d %H:%M:%S").to_string();
+    let log_entry = format!("[{}] {}\n", timestamp, line);
+
+    let log_path = log_file_error();
+    let _ = ensure_file_exists(&log_path);
+
+    if overwrite {
+        overwrite_file(log_path.to_str().unwrap(), &log_entry)?;
+    } else {
+        prepend_log_entry(log_path.to_str().unwrap(), &log_entry)?;
+    }
 
     Ok(())
 }
 
-/// Overwrites a file with the given text, removing any existing content.
-/// Creates the file if it doesn't exist.
-#[allow(unused)]
+/// Crea el archivo si no existe.
+pub fn ensure_file_exists<P: AsRef<Path>>(path: P) -> io::Result<()> {
+    if !path.as_ref().exists() {
+        OpenOptions::new()
+            .create(true)
+            .write(true)
+            .open(path)?;
+    }
+    Ok(())
+}
+
+/// Sobrescribe el contenido de un archivo con texto nuevo.
 pub fn overwrite_file(path: &str, text: &str) -> io::Result<()> {
     let mut file = OpenOptions::new()
         .write(true)
@@ -35,9 +56,24 @@ pub fn overwrite_file(path: &str, text: &str) -> io::Result<()> {
         .truncate(true)
         .open(path)?;
 
-    file.write_all(text.as_bytes())?;
-    Ok(())
+    file.write_all(text.as_bytes())
 }
+
+/// Inserta la entrada al inicio del archivo.
+pub fn prepend_log_entry(path: &str, new_entry: &str) -> io::Result<()> {
+    // Leer el contenido actual (si hay)
+    let previous = fs::read_to_string(path).unwrap_or_default();
+
+    // Escribir todo de nuevo: nueva entrada + contenido viejo
+    let mut file = OpenOptions::new()
+        .write(true)
+        .truncate(true)
+        .open(path)?;
+
+    file.write_all(new_entry.as_bytes())?;
+    file.write_all(previous.as_bytes())
+}
+
 
 #[allow(unused)]
 pub fn purge_log() -> io::Result<()> {
@@ -73,10 +109,22 @@ pub fn purge_log() -> io::Result<()> {
 #[allow(unused)]
 pub fn read_log_errors() -> io::Result<Vec<String>> {
     let log_path = log_file();
+    let error_log_path = log_file_error();
 
-    match fs::read_to_string(&log_path) {
-        Ok(content) => Ok(content.lines().map(|s| s.to_string()).collect()),
-        Err(e) if e.kind() == io::ErrorKind::NotFound => Ok(vec![]),
-        Err(e) => Err(e),
-    }
+    let log_ok = match fs::read_to_string(&log_path) {
+        Ok(ctn) => ctn,
+        _ => String::new()
+    };
+
+    let log_err = match fs::read_to_string(&error_log_path) {
+        Ok(ctn) => ctn,
+        _ => String::new()
+    };
+
+    Ok(vec![
+        "Log OK : ".to_string(),
+        log_ok,
+        "Log Error: ".to_string(),
+        log_err
+        ])
 }

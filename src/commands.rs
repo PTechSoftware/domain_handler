@@ -29,7 +29,8 @@ pub enum Commands{
     EnableOnBoot {
         #[arg(long, short)] activate: bool,
     },
-
+    #[command(name="view-log", alias="l")]
+    ViewLog,
     #[command(name="add-domain", alias="ad")]
     AddDomain{
         #[arg(long, short)] name: String,

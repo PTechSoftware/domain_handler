@@ -1,7 +1,6 @@
 use reqwest::{Client, Response};
 use std::{error::Error, process::Command};
-
-use crate::process::logger::entry_for_log;
+use crate::process::logger::entry_for_errorlog;
 
 #[allow(unused)]
 pub fn get_public_ip() -> Result<String, Box<dyn Error>> {
@@ -52,11 +51,11 @@ pub async fn send_update(domain: &str, ip : &str, token: &str,txt :Option<String
 
     // Handle the response
     if res.status().is_success() == false  {
-        let _ = entry_for_log(&format!(r#"**************************************************
+        let _ = entry_for_errorlog(&format!(r#"**************************************************
 Error al actualizar Dominio {}. 
 Detalles:
 {:?}
-**************************************************"#,domain,res));
+**************************************************"#,domain,res), false);
         return Err(Box::new(std::io::Error::new(
             std::io::ErrorKind::Other,
             format!("Request failed with status: {}", res.status()),
@@ -88,11 +87,11 @@ pub async fn send_update_no_ip(domain: &str, token: &str,txt :Option<String>) ->
 
     // Handle the response
     if res.status().is_success() == false  {
-        let _ = entry_for_log(&format!(r#"**************************************************
+        let _ = entry_for_errorlog(&format!(r#"**************************************************
 Error al actualizar Dominio {}. 
 Detalles:
 {:?}
-**************************************************"#,domain,res));
+**************************************************"#,domain,res), false);
         return Err(Box::new(std::io::Error::new(
             std::io::ErrorKind::Other,
             format!("Request failed with status: {}", res.status()),

@@ -11,10 +11,13 @@ pub fn config_file() -> PathBuf {
     config_dir().join("domainhdlr.json")
 }
 
-pub fn log_file() -> PathBuf {
+pub fn log_file_error() -> PathBuf {
     config_dir().join("log_error.txt")
 }
 
+pub fn log_file() -> PathBuf {
+    config_dir().join("log.txt")
+}
 pub fn bin_dir() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
