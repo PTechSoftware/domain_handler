@@ -1,6 +1,5 @@
 use std::fs;
-use std::io::{Write, Read};
-use std::os::unix::fs::PermissionsExt;
+use std::io::Write;
 use std::path::Path;
 use std::process::Command;
 use crate::process::rutas::{bin_dir, bin_path, config_dir, config_file, service_path, systemd_user_dir};
@@ -12,12 +11,10 @@ pub fn install_service() -> anyhow::Result<()> {
 
     // Copiar binario
     fs::copy("domainhdlr", &bin_path())?;
-    fs::set_permissions(&bin_path(), fs::Permissions::from_mode(0o755))?;
 
     // Copiar config si existe
     if Path::new("domainhdlr.json").exists() {
         fs::copy("domainhdlr.json", &config_file())?;
-        fs::set_permissions(&config_file(), fs::Permissions::from_mode(0o644))?;
     }
 
     let bashrc_path = dirs::home_dir().unwrap().join(".bashrc");
@@ -62,7 +59,6 @@ WantedBy=default.target
     );
 
     fs::write(service_path(), service_content)?;
-    fs::set_permissions(service_path(), fs::Permissions::from_mode(0o644))?;
 
     Command::new("systemctl")
         .args(["--user", "daemon-reload"])
@@ -71,9 +67,9 @@ WantedBy=default.target
     println!("✅ Service installed.");
 
     if added_to_bashrc {
-        println!("➕ Added ~/.local/bin to PATH via .bashrc.");
-        println!("🔁 Please run `source ~/.bashrc` or reopen your terminal.");
-        println!("👉 Or run the install via:\n   source <(domainhdlr install)\n   to apply PATH instantly.");
+        println!("Added ~/.local/bin to PATH via .bashrc.");
+        println!("Please run `source ~/.bashrc` or reopen your terminal.");
+        println!("Or run the install via:\n   source <(domainhdlr install)\n   to apply PATH instantly.");
         println!("{}", export_line); // permite que el export funcione si se usa source <(...)>
     }
 
@@ -113,9 +109,9 @@ pub fn set_enable_on_boot(enable: bool) -> anyhow::Result<()> {
         .status()?;
 
     if status.success() {
-        println!("✅ Service {}d on user boot.", action);
+        println!("Service {}d on user boot.", action);
     } else {
-        eprintln!("❌ Failed to {} service.", action);
+        eprintln!("Failed to {} service.", action);
     }
 
     Ok(())

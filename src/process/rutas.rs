@@ -15,10 +15,6 @@ pub fn log_file() -> PathBuf {
     config_dir().join("log_error.txt")
 }
 
-pub fn lock_file() -> PathBuf {
-    config_dir().join("lock")
-}
-
 pub fn bin_dir() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
