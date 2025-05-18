@@ -5,7 +5,6 @@ use std::path::Path;
 use std::process::Command;
 
 use crate::process::rutas::{bin_dir, bin_path, config_dir, config_file, service_path, systemd_user_dir};
-
 pub fn install_service() -> anyhow::Result<()> {
     match fs::create_dir_all(bin_dir()) {
         Ok(_) => println!("[OK] Created bin dir"),
@@ -22,14 +21,30 @@ pub fn install_service() -> anyhow::Result<()> {
         Err(e) => eprintln!("[ERR] Creating systemd user dir: {e}"),
     }
 
-    match fs::copy("domainhdlr", &bin_path()) {
-        Ok(_) => println!("[OK] Copied binary"),
-        Err(e) => eprintln!("[ERR] Copying binary: {e}"),
-    }
+    // 🔽 Copiar binario desde su propia ubicación
+    let this_exe = match std::env::current_exe() {
+        Ok(p) => p,
+        Err(e) => {
+            eprintln!("[ERR] Getting current exe path: {e}");
+            return Err(e.into());
+        }
+    };
 
-    match fs::set_permissions(&bin_path(), fs::Permissions::from_mode(0o755)) {
-        Ok(_) => println!("[OK] Set permissions on binary"),
-        Err(e) => eprintln!("[ERR] Setting binary permissions: {e}"),
+    if this_exe.is_file() {
+        match fs::copy(&this_exe, &bin_path()) {
+            Ok(_) => println!("[OK] Copied binary"),
+            Err(e) => eprintln!("[ERR] Copying binary: {e}"),
+        }
+
+        match fs::set_permissions(&bin_path(), fs::Permissions::from_mode(0o755)) {
+            Ok(_) => println!("[OK] Set permissions on binary"),
+            Err(e) => eprintln!("[ERR] Setting binary permissions: {e}"),
+        }
+    } else {
+        eprintln!(
+            "[ERR] Source binary is not a regular file: {}",
+            this_exe.display()
+        );
     }
 
     if Path::new("domainhdlr.json").exists() {
