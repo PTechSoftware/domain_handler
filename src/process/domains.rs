@@ -3,10 +3,11 @@ use std::path::PathBuf;
 use serde_json;
 use crate::models::entry::Entry;
 
+use super::rutas::config_file;
+
 #[allow(unused)]
 fn config_path() -> PathBuf {
-    let base = PathBuf::from(".");
-    base.join("domainhdlr").join("domains.json")
+    config_file()
 }
 #[allow(unused)]
 fn load_domains() -> Vec<Entry> {
