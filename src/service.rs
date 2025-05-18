@@ -6,8 +6,11 @@ use crate::process::loop_proc::run_loop;
 
 #[allow(unused)]
 fn lockfile_path() -> PathBuf {
-    std::env::temp_dir().join("domainhdlr.lock")
+    dirs::config_dir()
+        .unwrap_or_else(|| PathBuf::from("."))
+        .join("domainhdlr/lock")
 }
+
 
 #[allow(unused)]
 pub fn stop() -> anyhow::Result<()> {

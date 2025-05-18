@@ -1,101 +1,156 @@
 use std::fs;
+use std::io::{Write, Read};
 use std::os::unix::fs::PermissionsExt;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const SERVICE_PATH: &str = "/etc/systemd/system/domainhdlr.service";
-const BIN_PATH: &str = "/usr/local/bin/domainhdlr";
-const CONFIG_SRC: &str = "domainhdlr.json";
-const CONFIG_DST_DIR: &str = "/etc/domainhdlr";
-const CONFIG_DST: &str = "/etc/domainhdlr/domainhdlr.json";
+// === Paths ===
 
-pub fn install_service() -> anyhow::Result<()> {
-    // Copiar ejecutable
-    fs::copy("domainhdlr", BIN_PATH)?;
-    fs::set_permissions(BIN_PATH, fs::Permissions::from_mode(0o755))?;
+fn home_dir() -> PathBuf {
+    dirs::home_dir().expect("No home directory found")
+}
 
-    // Copiar configuración JSON si existe
-    if Path::new(CONFIG_SRC).exists() {
-        fs::create_dir_all(CONFIG_DST_DIR)?;
-        fs::copy(CONFIG_SRC, CONFIG_DST)?;
-        fs::set_permissions(CONFIG_DST, fs::Permissions::from_mode(0o644))?;
+fn local_bin() -> PathBuf {
+    home_dir().join(".local/bin")
+}
+
+fn config_dir() -> PathBuf {
+    home_dir().join(".config/domainhdlr")
+}
+
+fn systemd_user_dir() -> PathBuf {
+    home_dir().join(".config/systemd/user")
+}
+
+fn service_path() -> PathBuf {
+    systemd_user_dir().join("domainhdlr.service")
+}
+
+fn bin_dest() -> PathBuf {
+    local_bin().join("domainhdlr")
+}
+
+fn config_dest() -> PathBuf {
+    config_dir().join("domainhdlr.json")
+}
+
+// === Add ~/.local/bin to PATH ===
+
+fn ensure_local_bin_in_path() -> anyhow::Result<()> {
+    let home = home_dir();
+    let bashrc_path = home.join(".bashrc");
+    let export_line = r#"export PATH="$HOME/.local/bin:$PATH""#;
+
+    // Leer o crear .bashrc
+    let mut content = if bashrc_path.exists() {
+        fs::read_to_string(&bashrc_path)?
+    } else {
+        String::new()
+    };
+
+    if !content.contains(export_line) {
+        let mut file = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&bashrc_path)?;
+        writeln!(file, "\n{}", export_line)?;
+        println!("➕ Added ~/.local/bin to PATH in .bashrc");
     }
 
-    // Escribir unit file
-    let service_content = r#"[Unit]
+    Ok(())
+}
+
+// === Install ===
+
+pub fn install_service() -> anyhow::Result<()> {
+    // Crear carpetas necesarias
+    fs::create_dir_all(local_bin())?;
+    fs::create_dir_all(config_dir())?;
+    fs::create_dir_all(systemd_user_dir())?;
+
+    // Copiar ejecutable
+    fs::copy("domainhdlr", &bin_dest())?;
+    fs::set_permissions(&bin_dest(), fs::Permissions::from_mode(0o755))?;
+
+    // Copiar config si existe
+    if Path::new("domainhdlr.json").exists() {
+        fs::copy("domainhdlr.json", &config_dest())?;
+        fs::set_permissions(&config_dest(), fs::Permissions::from_mode(0o644))?;
+    }
+
+    // Agregar ~/.local/bin al PATH
+    ensure_local_bin_in_path()?;
+
+    // Escribir service
+    let service_content = format!(
+        r#"[Unit]
 Description=Domain Handler Service for DuckDNS
 After=network.target
 
 [Service]
-ExecStart=/usr/local/bin/domainhdlr start --detach=false
+ExecStart={} start --detach=false
 Restart=always
-User=root
-WorkingDirectory=/usr/local/bin
+User={}
+WorkingDirectory={}
 
 [Install]
-WantedBy=multi-user.target
-"#;
+WantedBy=default.target
+"#,
+        bin_dest().to_string_lossy(),
+        whoami::username(),
+        local_bin().to_string_lossy()
+    );
 
-    fs::write(SERVICE_PATH, service_content)?;
-    fs::set_permissions(SERVICE_PATH, fs::Permissions::from_mode(0o644))?;
+    fs::write(service_path(), service_content)?;
+    fs::set_permissions(service_path(), fs::Permissions::from_mode(0o644))?;
 
-    // Recargar systemd
-    Command::new("systemctl").args(["daemon-reexec"]).status()?;
-    Command::new("systemctl").args(["daemon-reload"]).status()?;
+    // Reload systemd user units
+    Command::new("systemctl")
+        .args(["--user", "daemon-reload"])
+        .status()?;
 
-    println!("Service installed successfully.");
+    println!("✅ Service installed for current user.");
+    println!("➡️  Run `source ~/.bashrc` or restart your terminal.");
+    println!("➡️  Enable service: `systemctl --user enable --now domainhdlr.service`");
+
     Ok(())
 }
+
+// === Uninstall ===
 
 pub fn uninstall_service() -> anyhow::Result<()> {
-    // Eliminar service
-    if fs::remove_file(SERVICE_PATH).is_ok() {
-        println!("Service file removed.");
+    let _ = fs::remove_file(service_path());
+    let _ = fs::remove_file(bin_dest());
+    let _ = fs::remove_file(config_dest());
+
+    if fs::read_dir(config_dir()).map_or(false, |mut d| d.next().is_none()) {
+        let _ = fs::remove_dir(config_dir());
     }
 
-    // Eliminar ejecutable
-    if fs::remove_file(BIN_PATH).is_ok() {
-        println!("Executable removed.");
+    if fs::read_dir(local_bin()).map_or(false, |mut d| d.next().is_none()) {
+        let _ = fs::remove_dir(local_bin());
     }
 
-    // Eliminar config JSON si existe
-    if Path::new(CONFIG_DST).exists() {
-        let _ = fs::remove_file(CONFIG_DST);
-        println!("Configuration file removed.");
-    }
+    Command::new("systemctl")
+        .args(["--user", "daemon-reload"])
+        .status()?;
 
-    // Eliminar carpeta si está vacía
-    if fs::read_dir(CONFIG_DST_DIR).map_or(false, |mut d| d.next().is_none()) {
-        let _ = fs::remove_dir(CONFIG_DST_DIR);
-    }
-
-    // Recargar systemd
-    Command::new("systemctl").args(["daemon-reload"]).status()?;
-    println!("Service uninstalled.");
+    println!("🗑️ Service uninstalled.");
     Ok(())
 }
 
-
-
-
-
-
-
-
+// === Enable/Disable on boot ===
 
 pub fn set_enable_on_boot(enable: bool) -> anyhow::Result<()> {
     let action = if enable { "enable" } else { "disable" };
     let status = Command::new("systemctl")
-        .args([action, "domainhdlr.service"])
+        .args(["--user", action, "domainhdlr.service"])
         .status()?;
 
     if status.success() {
-        println!(
-            "Service {}d to start on boot successfully.",
-            if enable { "enable" } else { "disable" }
-        );
+        println!("🔁 Service {}d on user boot.", action);
     } else {
-        eprintln!("Failed to {} service at boot.", action);
+        eprintln!("❌ Failed to {} service.", action);
     }
 
     Ok(())
