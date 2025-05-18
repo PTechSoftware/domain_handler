@@ -36,7 +36,7 @@ pub fn status() -> anyhow::Result<()> {
 }
 
 #[allow(unused)]
-pub fn start(_detach: bool) -> anyhow::Result<()> {
+pub async fn start() -> anyhow::Result<()> {
     //Create the lock file
     let lock_path = lockfile_path();
     let lock_file = File::create(&lock_path)?;
@@ -46,20 +46,8 @@ pub fn start(_detach: bool) -> anyhow::Result<()> {
     }
     //Do start stuff
 
-    if _detach {
-        // Hilo separado
-        std::thread::spawn(|| {
-            let rt = tokio::runtime::Runtime::new().unwrap();
-            let _ = rt.block_on(run_loop());
-        });
 
-        println!("Service started in background.");
-        return Ok(());
-    } else {
-        // Bloqueante
-        let rt = tokio::runtime::Runtime::new()?;
-        rt.block_on(run_loop())
-    }
-
+    run_loop().await;
+    println!("Service started in background.");
     Ok(())
 }

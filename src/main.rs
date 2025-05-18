@@ -12,8 +12,8 @@ mod process;
 async fn main() {
     let cli = Cli::parse();
     match cli.command {
-        Commands::Start { detach } => {
-            start(detach).unwrap();
+        Commands::Start=> {
+            _ = start().await;
         }
         Commands::Install => {
             _ = install_service();
@@ -31,8 +31,8 @@ async fn main() {
             status().unwrap();
         }
         Commands::Restart => {
-            stop().unwrap();
-            start(true).unwrap();
+            let _ = stop();
+            let  _ = start();
         }
         Commands::AddDomain { name, token, activated, txt } => {
             add_domain(&name, &token, activated, txt);

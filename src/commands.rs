@@ -15,10 +15,7 @@ pub enum Commands{
     #[command(name="uninstall", alias="u")]
     Uninstall,
     #[command(name="start", alias="s")]
-    Start{
-        #[arg(short, long, default_value_t = true)]
-        detach: bool,
-    },
+    Start,
     #[command(name="stop", alias="sp")]
     Stop,
     #[command(name="status", alias="st")]
