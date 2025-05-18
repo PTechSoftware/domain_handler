@@ -28,7 +28,7 @@ pub fn bin_path() -> PathBuf {
 pub fn systemd_user_dir() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))
-        .join(".config/systemd/user")
+        .join("/etc/systemd/system")
 }
 
 pub fn service_path() -> PathBuf {

@@ -98,7 +98,7 @@ Description=Domain Handler Service for DuckDNS
 After=network.target
 
 [Service]
-ExecStart={} start --detach=false
+ExecStart={} start
 Restart=always
 User={}
 WorkingDirectory={}
@@ -121,7 +121,7 @@ WantedBy=default.target
         Err(e) => eprintln!("[ERR] Setting permissions on service file: {e}"),
     }
 
-    match Command::new("systemctl").args(["--user", "daemon-reload"]).status() {
+    match Command::new("systemctl").args(["daemon-reload"]).status() {
         Ok(status) if status.success() => println!("[OK] Reloaded systemd user daemon"),
         Ok(status) => eprintln!("[ERR] systemctl reload failed with code {:?}", status.code()),
         Err(e) => eprintln!("[ERR] Running systemctl reload: {e}"),
