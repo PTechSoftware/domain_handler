@@ -14,8 +14,12 @@ pub enum Commands{
     Install,
     #[command(name="uninstall", alias="u")]
     Uninstall,
-    #[command(name="start", alias="s")]
-    Start,
+        #[command(name = "start", alias = "s")]
+    Start {
+        /// Ejecutar el servicio en segundo plano
+        #[arg(long, short)]
+        detached: bool,
+    },
     #[command(name="stop", alias="sp")]
     Stop,
     #[command(name="status", alias="st")]

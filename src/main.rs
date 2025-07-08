@@ -1,19 +1,34 @@
 use clap::Parser;
 use commands::{Cli, Commands};
-use process::{domains::{add_domain, delete_domain, list_domains}, logger::read_log_errors, ubuntu_service::{install_service, set_enable_on_boot, uninstall_service}};
+use process::{
+    domains::{add_domain, delete_domain, list_domains},
+    logger::read_log_errors,
+    ubuntu_service::{install_service, set_enable_on_boot, uninstall_service},
+};
 use service::{start, status, stop};
+use std::thread;
+use tokio::runtime::Runtime;
 
 mod commands;
-mod service;
 mod models;
 mod process;
+mod service;
 
 #[tokio::main]
 async fn main() {
     let cli = Cli::parse();
     match cli.command {
-        Commands::Start=> {
-            _ = start().await;
+        Commands::Start { detached } => {
+            if detached {
+                thread::spawn(|| {
+                    let rt = Runtime::new().expect("Failed to create Tokio runtime");
+                    if let Err(e) = rt.block_on(start()) {
+                        eprintln!("Error running detached service: {}", e);
+                    }
+                });
+            } else if let Err(e) = start().await {
+                eprintln!("Error starting service: {}", e);
+            }
         }
         Commands::Install => {
             _ = install_service();
@@ -21,7 +36,7 @@ async fn main() {
         Commands::Uninstall => {
             _ = uninstall_service();
         }
-        Commands::EnableOnBoot {activate } => {
+        Commands::EnableOnBoot { activate } => {
             _ = set_enable_on_boot(activate);
         }
         Commands::Stop => {
@@ -32,9 +47,14 @@ async fn main() {
         }
         Commands::Restart => {
             let _ = stop();
-            let  _ = start();
+            let _ = start();
         }
-        Commands::AddDomain { name, token, activated, txt } => {
+        Commands::AddDomain {
+            name,
+            token,
+            activated,
+            txt,
+        } => {
             add_domain(&name, &token, activated, txt);
         }
         Commands::DeleteDomain { name } => {

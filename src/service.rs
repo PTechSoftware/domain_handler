@@ -1,4 +1,3 @@
-use anyhow::Ok;
 use fs2::FileExt;
 use std::{fs::File, path::PathBuf};
 
@@ -13,7 +12,7 @@ fn lockfile_path() -> PathBuf {
 
 
 #[allow(unused)]
-pub fn stop() -> anyhow::Result<()> {
+pub fn stop() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let lock = lockfile_path();
     if lock.exists() {
         std::fs::remove_file(lock)?;
@@ -25,7 +24,7 @@ pub fn stop() -> anyhow::Result<()> {
 }
 
 #[allow(unused)]
-pub fn status() -> anyhow::Result<()> {
+pub fn status() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     let lock = lockfile_path();
     if lock.exists() {
         println!("Service is running.");
@@ -36,7 +35,7 @@ pub fn status() -> anyhow::Result<()> {
 }
 
 #[allow(unused)]
-pub async fn start() -> anyhow::Result<()> {
+pub async fn start() ->  Result<(), Box<dyn std::error::Error + Send + Sync>> {
     //Create the lock file
     let lock_path = lockfile_path();
     let lock_file = File::create(&lock_path)?;
