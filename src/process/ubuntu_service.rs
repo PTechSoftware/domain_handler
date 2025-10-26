@@ -1,5 +1,6 @@
 use std::fs;
 use std::io::Write;
+#[cfg(target_os = "linux")]
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
 use std::process::Command;
@@ -36,6 +37,7 @@ pub fn install_service() -> anyhow::Result<()> {
             Err(e) => eprintln!("[ERR] Copying binary: {e}"),
         }
 
+        #[cfg(target_os = "linux")]
         match fs::set_permissions(&bin_path(), fs::Permissions::from_mode(0o755)) {
             Ok(_) => println!("[OK] Set permissions on binary"),
             Err(e) => eprintln!("[ERR] Setting binary permissions: {e}"),
@@ -53,6 +55,7 @@ pub fn install_service() -> anyhow::Result<()> {
             Err(e) => eprintln!("[ERR] Copying config file: {e}"),
         }
 
+        #[cfg(target_os = "linux")]
         match fs::set_permissions(&config_file(), fs::Permissions::from_mode(0o644)) {
             Ok(_) => println!("[OK] Set permissions on config file"),
             Err(e) => eprintln!("[ERR] Setting config permissions: {e}"),
@@ -116,6 +119,7 @@ WantedBy=default.target
         Err(e) => eprintln!("[ERR] Writing service file: {e}"),
     }
 
+    #[cfg(target_os = "linux")]
     match fs::set_permissions(service_path(), fs::Permissions::from_mode(0o644)) {
         Ok(_) => println!("[OK] Set permissions on service file"),
         Err(e) => eprintln!("[ERR] Setting permissions on service file: {e}"),
