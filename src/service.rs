@@ -1,7 +1,7 @@
 use fs2::FileExt;
 use std::{fs::File, path::PathBuf};
 
-use crate::process::loop_proc::run_loop;
+use crate::{process::loop_proc::run_loop, sync_semaphore::acquire_single_instance};
 
 #[allow(unused)]
 fn lockfile_path() -> PathBuf {
@@ -36,16 +36,16 @@ pub fn status() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 #[allow(unused)]
 pub async fn start() ->  Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    //bloque el acceso y genero un singleton
+    acquire_single_instance().await.ok_or("Another instance is running")?;
     //Create the lock file
     let lock_path = lockfile_path();
     let lock_file = File::create(&lock_path)?;
     if let Err(e) = lock_file.try_lock_exclusive() {
         eprintln!("Service is running, no need to start again: {e}");
+        _ = std::fs::remove_file(lock_path);
         return Ok(());
     }
-    //Do start stuff
-
-
     run_loop().await;
     println!("Service started in background.");
     Ok(())

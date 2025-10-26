@@ -13,6 +13,7 @@ mod commands;
 mod models;
 mod process;
 mod service;
+mod sync_semaphore;
 
 #[tokio::main]
 async fn main() {

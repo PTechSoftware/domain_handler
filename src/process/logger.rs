@@ -76,17 +76,27 @@ pub fn prepend_log_entry(path: &str, new_entry: &str) -> io::Result<()> {
 
 
 #[allow(unused)]
+const MAX_LOG_SIZE: u64 = 25 * 1024; // 25 KB
+
+#[allow(unused)]
 pub fn purge_log() -> io::Result<()> {
-    const MAX_SIZE: u64 = 512 * 512; // 256 KB
     let log_path = log_file();
 
+    // ✅ Crear archivo si no existe
+    if !log_path.exists() {
+        println!("Log file does not exist. Creating it now.");
+        fs::File::create(&log_path)?;
+        return Ok(()); // No hay nada que purgar
+    }
+
+    // ✅ Intentar leer metadata
     match fs::metadata(&log_path) {
         Ok(metadata) => {
             let file_size = metadata.len();
-            if file_size > MAX_SIZE {
-                fs::remove_file(&log_path)?;
+            if file_size > MAX_LOG_SIZE {
+                fs::remove_file(&log_path)?; // o renombrar, si preferís rotación
                 println!(
-                    "Log file exceeded size limit ({} bytes). File deleted.",
+                    "Log file exceeded size limit ({} bytes). Deleted.",
                     file_size
                 );
             } else {
@@ -97,13 +107,16 @@ pub fn purge_log() -> io::Result<()> {
             }
         }
         Err(e) => {
-            println!("Log file not found or inaccessible. No action taken. ({})", e);
+            eprintln!(
+                "Could not access log file '{}': {}",
+                log_path.display(),
+                e
+            );
         }
     }
 
     Ok(())
 }
-
 /// Reads and returns all log entries as a vector of strings.
 /// If the log file does not exist, returns an empty vector.
 #[allow(unused)]

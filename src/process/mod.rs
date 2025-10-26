@@ -4,3 +4,5 @@ pub mod domains;
 pub mod ubuntu_service;
 pub mod loop_proc;
 pub mod rutas;
+pub mod dns_checker;
+pub mod notifier;
