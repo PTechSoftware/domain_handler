@@ -8,9 +8,6 @@ use process::{
 use service::{start, status, stop};
 use std::thread;
 use tokio::runtime::Runtime;
-
-use crate::sync_semaphore::acquire_single_instance;
-
 mod commands;
 mod models;
 mod process;
@@ -22,10 +19,6 @@ async fn main() {
     let cli = Cli::parse();
     match cli.command {
         Commands::Start { detached } => {
-            //bloque el acceso y genero un singleton
-            _ = acquire_single_instance()
-                .await
-                .ok_or("Another instance is running");
             if detached {
                 thread::spawn(|| {
                     let rt = Runtime::new().expect("Failed to create Tokio runtime");
@@ -54,11 +47,6 @@ async fn main() {
         }
         Commands::Restart => {
             let _ = stop();
-
-            //bloque el acceso y genero un singleton
-            _ = acquire_single_instance()
-                .await
-                .ok_or("Another instance is running");
             let _ = start();
         }
         Commands::AddDomain {
