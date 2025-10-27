@@ -147,23 +147,27 @@ pub async fn run_loop() {
                                         "[WARN] Domain {} still resolves to {} instead of {}",
                                         domain.name, dns_ip, current_ip
                                     );
-
+                                    //Tiempo para que actualice
+                                    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
                                     println!("{}", msg);
                                     let _ = entry_for_errorlog(&msg, true);
 
-                                    // ✉️ Enviar alerta por correo
-                                    let subject =
-                                        format!("⚠️ DNS desincronizado para {}", domain.name);
-                                    let body = format!(
-                                        "El dominio {} aún apunta a {} en lugar de {}.\nHora: {}",
-                                        domain.name,
-                                        dns_ip,
-                                        current_ip,
-                                        Local::now()
-                                            .with_timezone(&tz_offset)
-                                            .format("%Y-%m-%d %H:%M:%S")
-                                    );
-                                    let _ = send_email_alert(&mail_cfg, &subject, &body).await;
+                                    //si en 5 seg no actualizo mando mail
+                                    if err_ctr > 5 {
+                                        // ✉️ Enviar alerta por correo
+                                        let subject =
+                                            format!("⚠️ DNS desincronizado para {}", domain.name);
+                                        let body = format!(
+                                            "El dominio {} aún apunta a {} en lugar de {}.\nHora: {}",
+                                            domain.name,
+                                            dns_ip,
+                                            current_ip,
+                                            Local::now()
+                                                .with_timezone(&tz_offset)
+                                                .format("%Y-%m-%d %H:%M:%S")
+                                        );
+                                        let _ = send_email_alert(&mail_cfg, &subject, &body).await;
+                                    }
 
                                     had_previous_errors = true;
                                     err_ctr += 1;
