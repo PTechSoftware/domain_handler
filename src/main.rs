@@ -16,6 +16,14 @@ mod sync_semaphore;
 
 #[tokio::main]
 async fn main() {
+
+    let mail_cfg = process::notifier::MailConfig {
+        smtp_server: "smtp.gmail.com".into(),
+        smtp_port: 587,
+        sender: "ptechsoftware.correo@gmail.com".into(),
+        password: "gpoo gqqz cbjq jqzc".into(),
+        recipient: "nachopp98@gmail.com".into(),
+    };
     let cli = Cli::parse();
     match cli.command {
         Commands::Start { detached } => {
@@ -40,13 +48,13 @@ async fn main() {
             _ = set_enable_on_boot(activate);
         }
         Commands::Stop => {
-            stop().unwrap();
+            stop(&mail_cfg).unwrap();
         }
         Commands::Status => {
             status().unwrap();
         }
         Commands::Restart => {
-            let _ = stop();
+            let _ = stop(&mail_cfg);
             let _ = start();
         }
         Commands::AddDomain {

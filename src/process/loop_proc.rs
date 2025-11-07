@@ -9,7 +9,6 @@ use crate::process::{
     notifier::{MailConfig, send_email_alert},
 };
 use chrono::{FixedOffset, Local};
-use lettre::transport::smtp::response;
 
 #[allow(unused)]
 pub async fn run_loop() {
