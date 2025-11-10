@@ -25,43 +25,62 @@ pub fn stop(cfg: &MailConfig) -> Result<(), Box<dyn std::error::Error + Send + S
             if let Err(kill) = s {
                 let body = format!("No se pudo matar la instancia con PID: {}",pid.as_u32());
                 send_email_alert(cfg, "Kill error", "");
+            }else{
+                println!("Killed pid -> {}",pid.as_u32())
             }
 
         }
-    }
-
-
-    let lock = lockfile_path();
-    if lock.exists() {
-        std::fs::remove_file(lock)?;
-        println!("Service stopped.");
-    } else {
-        println!("Service was not running, not need to stop.");
     }
     Ok(())
 }
 
 #[allow(unused)]
 pub fn status() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    let lock = lockfile_path();
-    if lock.exists() {
-        println!("Service is running.");
-    } else {
-        println!("Service stopped.");
+
+    let mut s = System::new();
+    s.refresh_processes(sysinfo::ProcessesToUpdate::All, false);
+
+    // Imprimimos el encabezado
+    println!("### Estado del Sistema ###");
+    println!("=========================");
+
+    let mut found = false;  // Para verificar si encontramos el proceso
+
+    // Iteramos sobre los procesos para encontrar "domainhdlr"
+    for (pid, proc) in s.processes().iter() {
+
+        if proc.name() == "domainhdlr" {
+            found = true;
+
+            // Si encontramos el proceso, mostramos la información
+            println!("Proceso 'domainhdlr' encontrado:");
+            println!("PID: {}", pid);
+            println!("Nombre: {}", proc.name().to_str().unwrap_or(""));
+
+            let status = if proc.exists() {
+                "Corriendo"
+            } else {
+                "Detenido"
+            };
+
+            println!("Estado: {}", status);
+            println!("Uso de CPU: {:.2}%", proc.cpu_usage());
+            println!("Uso de Memoria: {:.2} MB", proc.memory() as f64 / 1024.0);
+            println!("------------------------");
+        }
     }
+
+    if !found {
+        println!("No se encontró el proceso 'domainhdlr'");
+    }
+
+    println!("=========================");
     Ok(())
 }
 
+
 #[allow(unused)]
 pub async fn start() ->  Result<(), Box<dyn std::error::Error + Send + Sync>> {
-    //Create the lock file
-    let lock_path = lockfile_path();
-    let lock_file = File::create(&lock_path)?;
-    if let Err(e) = lock_file.try_lock_exclusive() {
-        eprintln!("Service is running, no need to start again: {e}");
-        _ = std::fs::remove_file(lock_path);
-        return Ok(());
-    }
     run_loop().await;
     println!("Service started in background.");
     Ok(())
