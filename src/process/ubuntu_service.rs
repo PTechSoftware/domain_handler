@@ -21,8 +21,7 @@ pub fn install_service() -> anyhow::Result<()> {
         Ok(_) => println!("[OK] Created systemd user dir"),
         Err(e) => eprintln!("[ERR] Creating systemd user dir: {e}"),
     }
-
-    // 🔽 Copiar binario desde su propia ubicación
+    
     let this_exe = match std::env::current_exe() {
         Ok(p) => p,
         Err(e) => {
@@ -102,7 +101,7 @@ After=network.target
 
 [Service]
 ExecStart={} start
-Restart=always
+Restart=on-failure
 User={}
 WorkingDirectory={}
 

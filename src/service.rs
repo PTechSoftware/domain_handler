@@ -1,19 +1,12 @@
-use fs2::FileExt;
 use sysinfo::System;
-use std::{fs::File, path::PathBuf};
 
-use crate::process::{loop_proc::run_loop, notifier::{MailConfig, send_email_alert}};
+use crate::process::{file_lock::{create_lock_file, get_lock_path, remove_cfg_file}, loop_proc::run_loop, notifier::{MailConfig, send_email_alert}};
 
-#[allow(unused)]
-fn lockfile_path() -> PathBuf {
-    dirs::config_dir()
-        .unwrap_or_else(|| PathBuf::from("."))
-        .join("domainhdlr/lock")
-}
+
 
 
 #[allow(unused)]
-pub fn stop(cfg: &MailConfig) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
+pub async fn stop(cfg: &MailConfig) -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
     //Force kill
     let mut s = System::new();
     s.refresh_processes(sysinfo::ProcessesToUpdate::All, false);
@@ -31,6 +24,7 @@ pub fn stop(cfg: &MailConfig) -> Result<(), Box<dyn std::error::Error + Send + S
 
         }
     }
+    remove_cfg_file().await;
     Ok(())
 }
 
@@ -42,6 +36,8 @@ pub fn status() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
     // Imprimimos el encabezado
     println!("### Estado del Sistema ###");
+    println!("=========================");
+    println!("Estado File: existe [{}]",get_lock_path().unwrap().exists());
     println!("=========================");
 
     let mut found = false;  // Para verificar si encontramos el proceso
@@ -81,6 +77,7 @@ pub fn status() -> Result<(), Box<dyn std::error::Error + Send + Sync>> {
 
 #[allow(unused)]
 pub async fn start() ->  Result<(), Box<dyn std::error::Error + Send + Sync>> {
+    create_lock_file().await;
     run_loop().await;
     println!("Service started in background.");
     Ok(())

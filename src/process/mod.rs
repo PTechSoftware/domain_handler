@@ -6,3 +6,4 @@ pub mod loop_proc;
 pub mod rutas;
 pub mod dns_checker;
 pub mod notifier;
+pub mod file_lock;

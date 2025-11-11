@@ -5,12 +5,13 @@ use super::{
 };
 use crate::process::{
     dns_checker::check_dns_ip,
+    file_lock::get_lock_path,
     logger::{entry_for_log, purge_log},
     notifier::{MailConfig, send_email_alert},
 };
 use chrono::{FixedOffset, Local};
 
-#[allow(unused)]
+#[allow(unused, deprecated)]
 pub async fn run_loop() {
     // Configuración del correo
     let mail_cfg = MailConfig {
@@ -29,7 +30,8 @@ pub async fn run_loop() {
     // Offset horario fijo (-3 Uruguay)
     let tz_offset = FixedOffset::west(3 * 3600);
 
-    loop {
+    let mut exists = get_lock_path().unwrap().exists();
+    while exists == true {
         // 🔹 Purgar logs viejos
         let _ = purge_log();
 
@@ -147,7 +149,8 @@ pub async fn run_loop() {
                                         domain.name, dns_ip, current_ip
                                     );
                                     //Tiempo para que actualice
-                                    tokio::time::sleep(std::time::Duration::from_millis(1000)).await;
+                                    tokio::time::sleep(std::time::Duration::from_millis(1000))
+                                        .await;
                                     println!("{}", msg);
                                     let _ = entry_for_errorlog(&msg, true);
 
@@ -232,5 +235,7 @@ pub async fn run_loop() {
                 let _ = entry_for_log(&format!("[ERROR] Could not get public IP: {}", err), true);
             }
         }
+
+        exists = get_lock_path().unwrap().exists();
     }
 }

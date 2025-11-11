@@ -12,7 +12,6 @@ mod commands;
 mod models;
 mod process;
 mod service;
-mod sync_semaphore;
 
 #[tokio::main]
 async fn main() {
@@ -48,13 +47,13 @@ async fn main() {
             _ = set_enable_on_boot(activate);
         }
         Commands::Stop => {
-            stop(&mail_cfg).unwrap();
+            stop(&mail_cfg).await.unwrap();
         }
         Commands::Status => {
             status().unwrap();
         }
         Commands::Restart => {
-            let _ = stop(&mail_cfg);
+            stop(&mail_cfg).await.unwrap();
             let _ = start();
         }
         Commands::AddDomain {
