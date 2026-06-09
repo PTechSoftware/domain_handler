@@ -29,8 +29,6 @@ pub async fn send_email_alert(
 
     // 🔐 Autenticación
     let creds = Credentials::new(cfg.sender.clone(), cfg.password.clone());
-
-    // 🚀 Transport con TLS (STARTTLS en puerto 587)
     let mailer: AsyncSmtpTransport<Tokio1Executor> = AsyncSmtpTransport::<Tokio1Executor>::starttls_relay(&cfg.smtp_server)?
         .port(cfg.smtp_port)
         .credentials(creds)

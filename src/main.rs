@@ -15,18 +15,29 @@ mod service;
 
 #[tokio::main]
 async fn main() {
+    if !std::path::Path::new(".env").exists() {
+        let _ = std::fs::write(
+            ".env",
+            "SMTP_SERVER=\nSMTP_PORT=\nSMTP_SENDER=\nSMTP_PASSWORD=\nSMTP_RECIPIENT=\n",
+        );
+    }
+    dotenvy::dotenv().ok();
 
     let mail_cfg = process::notifier::MailConfig {
-        smtp_server: "smtp.gmail.com".into(),
-        smtp_port: 587,
-        sender: "ptechsoftware.correo@gmail.com".into(),
-        password: "gpoo gqqz cbjq jqzc".into(),
-        recipient: "nachopp98@gmail.com".into(),
+        smtp_server: std::env::var("SMTP_SERVER").unwrap_or_else(|_| "smtp.gmail.com".into()),
+        smtp_port: std::env::var("SMTP_PORT")
+            .unwrap_or_else(|_| "587".into())
+            .parse()
+            .unwrap_or(587),
+        sender: std::env::var("SMTP_SENDER").unwrap_or_else(|_| "mail@gmail.com".into()),
+        password: std::env::var("SMTP_PASSWORD").expect("SMTP_PASSWORD must be set in .env"),
+        recipient: std::env::var("SMTP_RECIPIENT").unwrap_or_else(|_| "mail@gmail.com".into()),
     };
     let cli = Cli::parse();
     match cli.command {
         Commands::Start { detached } => {
             if detached {
+                //Ver esto
                 thread::spawn(|| {
                     let rt = Runtime::new().expect("Failed to create Tokio runtime");
                     if let Err(e) = rt.block_on(start()) {
