@@ -16,7 +16,7 @@ pub fn entry_for_log(line: &str, overwrite: bool) -> io::Result<()> {
     if overwrite {
         overwrite_file(log_path.to_str().unwrap(), &log_entry)?;
     } else {
-        prepend_log_entry(log_path.to_str().unwrap(), &log_entry)?;
+        append_log_entry(log_path.to_str().unwrap(), &log_entry)?;
     }
 
     Ok(())
@@ -31,7 +31,7 @@ pub fn entry_for_errorlog(line: &str, overwrite: bool) -> io::Result<()> {
     if overwrite {
         overwrite_file(log_path.to_str().unwrap(), &log_entry)?;
     } else {
-        prepend_log_entry(log_path.to_str().unwrap(), &log_entry)?;
+        append_log_entry(log_path.to_str().unwrap(), &log_entry)?;
     }
 
     Ok(())
@@ -59,59 +59,46 @@ pub fn overwrite_file(path: &str, text: &str) -> io::Result<()> {
     file.write_all(text.as_bytes())
 }
 
-/// Inserta la entrada al inicio del archivo.
-pub fn prepend_log_entry(path: &str, new_entry: &str) -> io::Result<()> {
-    // Leer el contenido actual (si hay)
-    let previous = fs::read_to_string(path).unwrap_or_default();
-
-    // Escribir todo de nuevo: nueva entrada + contenido viejo
+/// Inserta la entrada al final del archivo.
+pub fn append_log_entry(path: &str, new_entry: &str) -> io::Result<()> {
     let mut file = OpenOptions::new()
         .write(true)
-        .truncate(true)
+        .append(true)
         .open(path)?;
 
-    file.write_all(new_entry.as_bytes())?;
-    file.write_all(previous.as_bytes())
+    file.write_all(new_entry.as_bytes())
 }
 
 
 #[allow(unused)]
-const MAX_LOG_SIZE: u64 = 25 * 1024; // 25 KB
+const MAX_LOG_SIZE: u64 = 60 * 1024 * 1024; // 60 MB
 
 #[allow(unused)]
 pub fn purge_log() -> io::Result<()> {
     let log_path = log_file();
 
-    // ✅ Crear archivo si no existe
     if !log_path.exists() {
-        println!("Log file does not exist. Creating it now.");
         fs::File::create(&log_path)?;
-        return Ok(()); // No hay nada que purgar
+    } else if let Ok(metadata) = fs::metadata(&log_path) {
+        let file_size = metadata.len();
+        if file_size > MAX_LOG_SIZE {
+            let old_log_path = log_path.with_extension("old.txt");
+            let _ = fs::rename(&log_path, &old_log_path);
+            fs::File::create(&log_path)?;
+            println!("Log file exceeded size limit ({} bytes). Rotated.", file_size);
+        }
     }
 
-    // ✅ Intentar leer metadata
-    match fs::metadata(&log_path) {
-        Ok(metadata) => {
-            let file_size = metadata.len();
-            if file_size > MAX_LOG_SIZE {
-                fs::remove_file(&log_path)?; // o renombrar, si preferís rotación
-                println!(
-                    "Log file exceeded size limit ({} bytes). Deleted.",
-                    file_size
-                );
-            } else {
-                println!(
-                    "Log file is within size limit ({} bytes).",
-                    file_size
-                );
-            }
-        }
-        Err(e) => {
-            eprintln!(
-                "Could not access log file '{}': {}",
-                log_path.display(),
-                e
-            );
+    let error_log_path = log_file_error();
+    if !error_log_path.exists() {
+        fs::File::create(&error_log_path)?;
+    } else if let Ok(metadata) = fs::metadata(&error_log_path) {
+        let file_size = metadata.len();
+        if file_size > MAX_LOG_SIZE {
+            let old_err_log_path = error_log_path.with_extension("old.txt");
+            let _ = fs::rename(&error_log_path, &old_err_log_path);
+            fs::File::create(&error_log_path)?;
+            println!("Error log file exceeded size limit ({} bytes). Rotated.", file_size);
         }
     }
 

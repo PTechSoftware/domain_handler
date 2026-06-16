@@ -18,6 +18,10 @@ pub fn log_file_error() -> PathBuf {
 pub fn log_file() -> PathBuf {
     config_dir().join("log.txt")
 }
+
+pub fn status_file() -> PathBuf {
+    config_dir().join("status.json")
+}
 pub fn bin_dir() -> PathBuf {
     dirs::home_dir()
         .unwrap_or_else(|| PathBuf::from("."))

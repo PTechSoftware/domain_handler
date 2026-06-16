@@ -7,13 +7,12 @@ use tokio::fs;
 const APP_LOCK_FILE: &str = "domain.lock"; 
 
 
-#[allow(dead_code, unused,non_upper_case_globals)]
-const lck: std::sync::Mutex<bool> = Mutex::new(true);
+#[allow(dead_code, unused, non_upper_case_globals)]
+static lck: std::sync::Mutex<bool> = Mutex::new(true);
 
 #[allow(dead_code, unused)]
 /// Construye la ruta completa al lock file.
 pub fn get_lock_path() -> Result<PathBuf, String> {
-    lck.lock();
     // ... (lógica para encontrar el directorio de configuración) ...
     let cfg_dir = dirs::config_dir()
         .ok_or_else(|| "No se pudo determinar el directorio de configuración.".to_string())?;
@@ -25,8 +24,6 @@ pub fn get_lock_path() -> Result<PathBuf, String> {
 #[allow(dead_code, unused)]
 ///Elimina el lock file.
 pub async fn remove_cfg_file() -> Result<(), Box<dyn std::error::Error>> {
-
-    lck.lock();
     // Obtiene la ruta del lock file.
     let lock_path = get_lock_path().map_err(|e| e.to_string())?;
 
@@ -59,9 +56,12 @@ pub async fn create_lock_file() -> Result<bool, Box<dyn std::error::Error>> {
         .open(&lock_path)
         .await 
     {
-        Ok(_) => {
+        Ok(mut file) => {
+            use tokio::io::AsyncWriteExt;
+            let pid = std::process::id();
+            let _ = file.write_all(pid.to_string().as_bytes()).await;
             // Éxito: el archivo fue creado, bloqueo obtenido.
-            println!("✅ Lock file creado. Bloqueo adquirido en: {}", lock_path.display());
+            println!("✅ Lock file creado con PID {}. Bloqueo adquirido en: {}", pid, lock_path.display());
             Ok(true) 
         }
         Err(e) if e.kind() == ErrorKind::AlreadyExists => {

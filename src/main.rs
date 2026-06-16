@@ -6,8 +6,6 @@ use process::{
     ubuntu_service::{install_service, set_enable_on_boot, uninstall_service},
 };
 use service::{start, status, stop};
-use std::thread;
-use tokio::runtime::Runtime;
 mod commands;
 mod models;
 mod process;
@@ -37,13 +35,18 @@ async fn main() {
     match cli.command {
         Commands::Start { detached } => {
             if detached {
-                //Ver esto
-                thread::spawn(|| {
-                    let rt = Runtime::new().expect("Failed to create Tokio runtime");
-                    if let Err(e) = rt.block_on(start()) {
-                        eprintln!("Error running detached service: {}", e);
-                    }
-                });
+                println!("Starting supervisor in background...");
+                let exe = std::env::current_exe().expect("Failed to get current executable path");
+                match std::process::Command::new(exe)
+                    .arg("run-supervisor")
+                    .stdin(std::process::Stdio::null())
+                    .stdout(std::process::Stdio::null())
+                    .stderr(std::process::Stdio::null())
+                    .spawn()
+                {
+                    Ok(child) => println!("Supervisor started with PID {}", child.id()),
+                    Err(e) => eprintln!("Failed to start supervisor: {}", e),
+                }
             } else if let Err(e) = start().await {
                 eprintln!("Error starting service: {}", e);
             }
@@ -92,6 +95,39 @@ async fn main() {
                 _ => {
                     println!("Failed retrive logs")
                 }
+            }
+        }
+        Commands::RunSupervisor => {
+            let exe = std::env::current_exe().expect("Failed to get executable");
+            let lock_path = process::file_lock::get_lock_path().unwrap();
+
+            if let Some(parent) = lock_path.parent() {
+                let _ = std::fs::create_dir_all(parent);
+            }
+            let _ = std::fs::write(&lock_path, "supervisor_starting");
+
+            loop {
+                let mut child = std::process::Command::new(&exe)
+                    .arg("run-worker")
+                    .spawn()
+                    .expect("Failed to spawn worker");
+
+                let _ = child.wait(); // Bloquea hasta que el worker muere
+
+                if !lock_path.exists() {
+                    break;
+                }
+
+                let _ = process::logger::entry_for_errorlog(
+                    "[SUPERVISOR] Worker crashed. Restarting in 5s...",
+                    true,
+                );
+                std::thread::sleep(std::time::Duration::from_secs(5));
+            }
+        }
+        Commands::RunWorker => {
+            if let Err(e) = start().await {
+                eprintln!("Error in worker: {}", e);
             }
         }
     }
